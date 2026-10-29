@@ -1,12 +1,56 @@
-function criarServico(repository, { required = [], owerFild = null, senitize = (value) => value } = {}) {
-    return {
-        async listar(user) {
-            const item = await createMySqlRepository.findAll();
-            return owerFild && user.role !== 'admin'
-            ? DataTransferItemList.filter((item) => item[owerFild] === user.id)
-            : item;
-        }
+// import { AppError } from '../shared/errors.js';
+// import { validarObrigatorios } from '../validators/resourceValidator.js';
+
+function criarServico(repository, { required = [], ownerField = null, sanitize = (value) => value } = {}) {
+  return {
+    async listar(user) {
+      const items = await repository.findAll();
+
+      return ownerField && user.role !== 'admin'
+        ? items.filter((item) => item[ownerField] === user.id)
+        : items;
+    },
+
+    async buscar(id, user) {
+      const item = await repository.findById(id);
+
+      if (!item || (ownerField && user.role !== 'admin' && item[ownerField] !== user.id)) {
+        return null;
+      }
+
+      return sanitize(item);
+    },
+
+    async criar(body, user) {
+      // validarObrigatorios(body, required);
+
+      const attributes = ownerField
+        ? { ...body, [ownerField]: user.id }
+        : body;
+
+      return repository.create(sanitize(attributes));
+    },
+
+    async atualizar(id, body, user) {
+      const existing = await this.buscar(id, user);
+
+      if (!existing) return null;
+
+      const attributes = { ...body };
+
+      if (ownerField) delete attributes[ownerField];
+
+      return repository.update(existing.id, sanitize(attributes));
+    },
+
+    async remover(id, user) {
+      const existing = await this.buscar(id, user);
+
+      if (!existing) return null;
+
+      await repository.delete(id);
     }
-};
+  };
+}
 
 export default criarServico;
